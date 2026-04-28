@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Nómina Mariachi</title>
+    <link id="favicon" rel="icon" type="image/png" href="admin.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
@@ -132,7 +133,13 @@
     const userRole = urlParams.get('role'); // Lee el parámetro ?role=
 
     window.onload = () => {
-        // 1. Configurar fecha por defecto
+        // Función interna para cambiar el archivo del icono
+        const cambiarIcono = (archivo) => {
+            const link = document.getElementById('favicon');
+            link.href = archivo + '?v=' + new Date().getTime(); // El ?v= evita que el navegador use el icono viejo guardado en caché
+        };
+
+        // Configurar fecha por defecto en la pantalla de serenatas
         const campoFecha = document.getElementById('fecha-serenata');
         if(campoFecha) campoFecha.valueAsDate = new Date();
 
@@ -140,19 +147,22 @@
         const userRole = urlParams.get('role');
 
         if (userRole === 'musico') {
+            cambiarIcono('musico.png'); // Carga tu logo de músico
+            document.title = "Músicos - Nómina";
             document.getElementById('pantalla-login').classList.add('hidden');
             mostrarPortalMiembros();
         } else {
-            // --- LÓGICA DE PERSISTENCIA ADMIN ---
+            cambiarIcono('admin.png'); // Carga tu logo de admin
+            document.title = "Admin - Nómina Mariachi";
+            
+            // Lógica de persistencia de sesión para el admin
             const lastLogin = localStorage.getItem('admin_session_time');
             const ahora = new Date().getTime();
-            const unaHora = 60 * 60 * 1000; // Milisegundos en 1 hora
+            const unaHora = 60 * 60 * 1000;
 
             if (lastLogin && (ahora - lastLogin < unaHora)) {
-                // Si hay sesión y no ha pasado la hora, entra directo al menú
                 navegar('menu');
             } else {
-                // Si no hay sesión o expiró, limpia y muestra login
                 localStorage.removeItem('admin_session_time');
                 navegar('login');
             }
@@ -618,6 +628,10 @@ async function procesarCambioClaveMiembro(nombre) {
         }
     });
 }
+    function cambiarIcono(emoji) {
+        const favicon = document.getElementById('favicon');
+        favicon.href = `data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>${emoji}</text></svg>`;
+    }
 </script>
 </body>
 </html>
