@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Nómina Mariachi</title>
+    <title>Registro Mariachi</title>
     <link id="favicon" rel="icon" type="image/png" href="admin.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
@@ -48,7 +48,7 @@
     <div id="pantalla-login" class="flex flex-col items-center justify-center min-h-screen p-6">
         <div class="w-full max-w-sm text-center">
             <span class="text-7xl">🎺</span>
-            <h1 class="text-4xl font-black my-8 uppercase tracking-tighter italic">Mariachi<br><span class="text-blue-600">Nómina</span></h1>
+            <h1 class="text-4xl font-black my-8 uppercase tracking-tighter italic">Mariachi<br><span class="text-blue-600">Servicios</span></h1>
             <input type="password" id="pass-input" inputmode="numeric" placeholder="Contraseña" class="w-full text-center text-3xl mb-6 py-6 bg-white border-2 border-slate-100 rounded-[2rem] outline-none shadow-inner">
             <button onclick="validarAcceso()" class="w-full bg-slate-900 text-white p-6 text-xl font-black rounded-[2rem] shadow-xl active:scale-95 transition-all uppercase">Acceder</button>
             <button onclick="mostrarCambiarPass()" class="mt-6 text-slate-400 text-sm font-medium">Cambiar clave</button>
@@ -148,12 +148,12 @@
 
         if (userRole === 'musico') {
             cambiarIcono('musico.png'); // Carga tu logo de músico
-            document.title = "Músicos - Nómina";
+            document.title = "Músicos - Servivicios";
             document.getElementById('pantalla-login').classList.add('hidden');
             mostrarPortalMiembros();
         } else {
             cambiarIcono('admin.png'); // Carga tu logo de admin
-            document.title = "Admin - Nómina Mariachi";
+            document.title = "Admin - Servicios Mariachi";
             
             // Lógica de persistencia de sesión para el admin
             const lastLogin = localStorage.getItem('admin_session_time');
@@ -390,24 +390,41 @@ function confirmarGuardarSerenatas() {
 
     function renderizarTotales() {
         const list = document.getElementById('lista-totales');
-        list.innerHTML = INTEGRANTES.map(n => `
-            <div class="card-estilo border-l-8 border-indigo-600 bg-white">
-                <div class="flex justify-between items-start mb-4">
-                    <span class="text-3xl font-black text-slate-800 leading-none">${n}</span>
-                    <span class="text-3xl font-black text-indigo-700 leading-none">$${saldos[n].toLocaleString('es-CO')}</span>
-                </div>
-                <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">Historial Reciente</div>
-                <div class="max-h-32 overflow-y-auto text-[13px] bg-slate-50 p-4 rounded-3xl font-bold">
-                    ${historial.filter(h => h.nombre === n).slice(0,5).map(h => `
-                    <div class="flex justify-between py-1 border-b border-slate-200">
-                        <span>${h.fecha} ${h.tipo ? '<b class="text-[9px] text-indigo-500">LIQ</b>' : ''}</span>
-                        <span class="text-red-500">-$${h.monto.toLocaleString()}</span>
+        list.innerHTML = INTEGRANTES.map(n => {
+            // 1. Buscamos el índice de la última vez que se le liquidó todo
+            const indiceUltimaLiq = historial.findIndex(h => h.nombre === n && h.tipo === "Cobro Total");
+
+            // 2. Si existe una liquidación, mostramos desde ahí. Si no, mostramos todo.
+            let movimientosMostrar = [];
+            if (indiceUltimaLiq !== -1) {
+                // Cortamos desde el inicio hasta la última liquidación encontrada
+                movimientosMostrar = historial.filter(h => h.nombre === n).slice(0, indiceUltimaLiq + 1);
+            } else {
+                movimientosMostrar = historial.filter(h => h.nombre === n);
+            }
+
+            // 3. Solo queremos ver salidas de dinero (Adelantos y Cobros Totales)
+            const egresos = movimientosMostrar.filter(h => h.tipo === "Adelanto" || h.tipo === "Cobro Total");
+
+            return `
+                <div class="card-estilo border-l-8 border-indigo-600 bg-white">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="text-3xl font-black text-slate-800 leading-none">${n}</span>
+                        <span class="text-3xl font-black text-indigo-700 leading-none">$${saldos[n].toLocaleString('es-CO')}</span>
                     </div>
-`).join('') || '<span class="text-slate-300 italic">Sin movimientos</span>'}
+                    <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">Ciclo de Cobro Actual</div>
+                    <div class="max-h-32 overflow-y-auto text-[13px] bg-slate-50 p-4 rounded-3xl font-bold">
+                        ${egresos.map(h => `
+                            <div class="flex justify-between py-1 border-b border-slate-200">
+                                <span>${h.fecha} <b class="text-[9px] text-indigo-500 uppercase">${h.tipo}</b></span>
+                                <span class="text-red-500">-$${h.monto.toLocaleString()}</span>
+                            </div>
+                        `).join('') || '<span class="text-slate-300 italic">Sin movimientos en este ciclo</span>'}
+                    </div>
+                    <button onclick="confirmarCobroTotal('${n}')" class="w-full mt-6 bg-slate-900 text-white py-5 rounded-[2rem] font-black text-sm uppercase shadow-lg">Liquidar Cuenta</button>
                 </div>
-                <button onclick="confirmarCobroTotal('${n}')" class="w-full mt-6 bg-slate-900 text-white py-5 rounded-[2rem] font-black text-sm uppercase shadow-lg">Liquidar Cuenta</button>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     function confirmarCobroTotal(n) {
@@ -466,7 +483,7 @@ function mostrarPortalMiembros() {
         <div class="h-screen flex flex-col items-center justify-center p-6">
             <div class="mb-8 text-center">
                 <h1 class="text-4xl font-black italic mb-2 text-blue-900 uppercase">Músicos</h1>
-                <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Consulta de Pagos</p>
+                <p class="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">Consulta de Shows</p>
             </div>
             
             <div class="w-full max-w-sm bg-white p-8 rounded-[2.5rem] shadow-xl border border-slate-100">
@@ -520,72 +537,81 @@ async function validarAccesoMiembro() {
 async function renderDashboardMiembro(nombre) {
     const container = document.getElementById('pantalla-miembros');
     
-    // Lógica de fechas: 35 días atrás desde hoy
-    const hoy = new Date();
-    const limite35Dias = new Date();
-    limite35Dias.setDate(hoy.getDate() - 35);
-
-    const misMovimientos = historial
-                    .filter(h => h.nombre === nombre)
-                    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); // Los más nuevos primero
-    
-    // Calcular "Cobrado": Suma solo Adelantos/Pagos de los últimos 35 días
-    const cobrado35 = misMovimientos.filter(h => {
-        let fechaMov;
-        if (h.fecha.includes('-')) {
-            // Si viene del input viejo (AAAA-MM-DD)
-            const [a, m, d] = h.fecha.split('-');
-            fechaMov = new Date(a, m - 1, d);
-        } else {
-            // Si viene del nuevo formato (DD/MM/AAAA)
-            const [d, m, a] = h.fecha.split('/');
-            fechaMov = new Date(a, m - 1, d);
+    // 1. FUNCIÓN INTERNA PARA NORMALIZAR FECHAS Y ORDENAR
+    const obtenerTiempo = (fechaStr) => {
+        if (!fechaStr) return 0;
+        let d, m, a;
+        if (fechaStr.includes('-')) {
+            [a, m, d] = fechaStr.split('-');
+        } else if (fechaStr.includes('/')) {
+            [d, m, a] = fechaStr.split('/');
         }
-        
-        return fechaMov >= limite35Dias && h.tipo !== "Serenatas de la fecha";
-    }).reduce((acc, h) => acc + h.monto, 0);
+        return new Date(a, m - 1, d).getTime();
+    };
+
+    // 2. ORDENAR POR FECHA REAL (No por texto)
+    const todosMisMovimientos = historial
+        .filter(h => h.nombre === nombre)
+        .sort((a, b) => obtenerTiempo(b.fecha) - obtenerTiempo(a.fecha));
+
+    // 3. FILTRO DE CICLO (Desde la última liquidación total)
+    const indiceUltimaLiq = todosMisMovimientos.findIndex(h => h.tipo === "Cobro Total");
+    const misMovimientos = indiceUltimaLiq !== -1 
+        ? todosMisMovimientos.slice(0, indiceUltimaLiq + 1) 
+        : todosMisMovimientos;
+
+    // 4. CÁLCULO DE COBRADO (35 DÍAS)
+    const hoy = new Date();
+    const limite35 = hoy.getTime() - (35 * 24 * 60 * 60 * 1000);
+    const cobrado35 = todosMisMovimientos
+        .filter(h => obtenerTiempo(h.fecha) >= limite35 && (h.tipo === "Adelanto" || h.tipo === "Cobro Total"))
+        .reduce((acc, h) => acc + h.monto, 0);
     
     container.innerHTML = `
-        <div class="p-6 pb-20 max-w-md mx-auto">
+        <div class="p-6 pb-24 max-w-md mx-auto bg-slate-50 min-h-screen font-sans">
             <header class="flex justify-between items-center mb-8">
-                <h2 class="text-2xl font-black italic">${nombre}</h2>
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800 leading-none">${nombre}</h2>
+                    <p class="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-1">Estado de Servicios</p>
+                </div>
                 <div class="flex gap-2">
-                    <button onclick="mostrarCambioClaveMiembro('${nombre}')" class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">🔑</button>
-                    <button onclick="location.reload()" class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-red-500 font-bold">✕</button>
+                    <button onclick="mostrarCambioClaveMiembro('${nombre}')" class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100">🔑</button>
+                    <button onclick="location.reload()" class="bg-white p-3 rounded-2xl shadow-sm border border-slate-100 text-red-500 font-bold">✕</button>
                 </div>
             </header>
 
-            <div class="grid grid-cols-2 gap-3 mb-6">
-                <div class="bg-blue-600 p-5 rounded-[2rem] text-white shadow-lg shadow-blue-100">
-                    <p class="text-[9px] font-black uppercase opacity-70">Pendiente</p>
-                    <p class="text-xl font-black">$${saldos[nombre].toLocaleString()}</p>
+            <div class="grid grid-cols-2 gap-4 mb-8">
+                <div class="bg-blue-900 p-6 rounded-[2.5rem] text-white shadow-xl shadow-blue-200">
+                    <p class="text-[10px] font-black uppercase opacity-60 mb-2">A Favor</p>
+                    <p class="text-2xl font-black">$${saldos[nombre].toLocaleString()}</p>
                 </div>
-                <div class="bg-emerald-500 p-5 rounded-[2rem] text-white shadow-lg shadow-emerald-100">
-                    <p class="text-[9px] font-black uppercase opacity-70">Cobrado (35d)</p>
-                    <p class="text-xl font-black">$${cobrado35.toLocaleString()}</p>
+                <div class="bg-white p-6 rounded-[2.5rem] text-slate-800 shadow-sm border border-slate-100">
+                    <p class="text-[9px] font-black uppercase text-emerald-500 mb-2">Cobrado (35d)</p>
+                    <p class="text-2xl font-black">$${cobrado35.toLocaleString()}</p>
                 </div>
             </div>
 
-            <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 ml-2">Historial Detallado</h3>
+            <h3 class="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 ml-2">Historial del Ciclo</h3>
             
             <div class="space-y-3">
-                ${misMovimientos.length === 0 ? '<p class="text-center text-slate-300 py-10 italic">No hay movimientos</p>' : ''}
-
                 ${misMovimientos.map(h => {
-                    // Si el tipo es "Serenatas de la fecha", es que GANÓ dinero (+)
-                    // Si es "Adelanto" o "Liquidación", es que SACÓ dinero (-)
-                    const esGanancia = h.tipo === "Serenatas de la fecha";
-                    const color = esGanancia ? "text-emerald-600" : "text-orange-600";
-                    const prefijo = esGanancia ? "+$" : "-$";
+                    const esIngreso = h.tipo === "Serenatas de la fecha";
+                    const colorMonto = esIngreso ? "text-emerald-500" : "text-orange-500";
+                    const simbolo = esIngreso ? "+" : "-";
                     
                     return `
-                        <div class="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center">
-                            <div>
-                                <p class="text-[10px] font-black text-slate-400 uppercase">${h.fecha}</p>
-                                <p class="font-bold text-slate-800">${h.tipo || 'Adelanto / Pago'}</p>
+                        <div class="bg-white p-5 rounded-[2rem] border border-slate-50 flex justify-between items-center shadow-sm">
+                            <div class="flex items-center gap-4">
+                                <div class="w-10 h-10 ${esIngreso ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'} rounded-full flex items-center justify-center font-black text-xs">
+                                    ${esIngreso ? '♪' : '▼'}
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-black text-slate-400 uppercase mb-0.5">${h.fecha}</p>
+                                    <p class="font-black text-slate-700 text-sm">${h.tipo}</p>
+                                </div>
                             </div>
                             <div class="text-right">
-                                <p class="${color} font-black">${prefijo}${h.monto.toLocaleString()}</p>
+                                <p class="${colorMonto} font-black text-lg">${simbolo}$${h.monto.toLocaleString()}</p>
                             </div>
                         </div>
                     `;
@@ -593,7 +619,13 @@ async function renderDashboardMiembro(nombre) {
             </div>
             
             <p class="text-center text-[10px] text-slate-300 mt-8 uppercase font-bold tracking-widest">Fin del reporte</p>
+            <div class="mt-10 p-6 bg-blue-50/50 rounded-[2.5rem] border border-dashed border-blue-100">
+                <p class="text-[12px] font-bold text-blue-400 uppercase text-center leading-relaxed tracking-wider">
+                    Las serenatas se suman a tu favor automáticamente.<br>Los adelantos y cobros disminuyen el saldo.
+                </p>
+            </div>
         </div>
+        
     `;
 }
 
