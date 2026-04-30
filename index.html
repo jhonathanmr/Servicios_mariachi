@@ -141,7 +141,19 @@
 
         // Configurar fecha por defecto en la pantalla de serenatas
         const campoFecha = document.getElementById('fecha-serenata');
-        if(campoFecha) campoFecha.valueAsDate = new Date();
+        if (campoFecha) {
+            // 1. Obtenemos la fecha actual
+            const ahora = new Date();
+            
+            // 2. Restamos 5 horas (5 * 60 * 60 * 1000 milisegundos)
+            const fechaColombia = new Date(ahora.getTime() - (5 * 60 * 60 * 1000));
+            
+            // 3. Lo convertimos a formato ISO (YYYY-MM-DDTHH:mm...) y tomamos solo la fecha
+            const soloFecha = fechaColombia.toISOString().split('T')[0];
+            
+            // 4. Asignamos al input
+            campoFecha.value = soloFecha;
+        }
 
         const urlParams = new URLSearchParams(window.location.search);
         const userRole = urlParams.get('role');
@@ -390,38 +402,57 @@ function confirmarGuardarSerenatas() {
 
     function renderizarTotales() {
         const list = document.getElementById('lista-totales');
+        if (!list) return;
+
+        // Aseguramos que tenemos datos
+        const dataHistorial = window.historial || historial || [];
+        const dataSaldos = window.saldos || saldos || {};
+
+        if (INTEGRANTES.length === 0) {
+            list.innerHTML = `<p class="text-center p-10 text-slate-400">No hay integrantes definidos.</p>`;
+            return;
+        }
+
         list.innerHTML = INTEGRANTES.map(n => {
-            // 1. Buscamos el índice de la última vez que se le liquidó todo
-            const indiceUltimaLiq = historial.findIndex(h => h.nombre === n && h.tipo === "Cobro Total");
+            const saldoActual = dataSaldos[n] || 0;
+            
+            // Buscamos los movimientos del músico
+            // Filtramos por nombre y por tipos que representen salidas de dinero
+            const movimientosMúsico = dataHistorial.filter(h => 
+                h.nombre === n && 
+                (h.tipo.includes("Adelanto") || h.tipo.includes("LIQUIDACIÓN") || h.tipo.includes("Cobro"))
+            );
 
-            // 2. Si existe una liquidación, mostramos desde ahí. Si no, mostramos todo.
-            let movimientosMostrar = [];
-            if (indiceUltimaLiq !== -1) {
-                // Cortamos desde el inicio hasta la última liquidación encontrada
-                movimientosMostrar = historial.filter(h => h.nombre === n).slice(0, indiceUltimaLiq + 1);
-            } else {
-                movimientosMostrar = historial.filter(h => h.nombre === n);
-            }
-
-            // 3. Solo queremos ver salidas de dinero (Adelantos y Cobros Totales)
-            const egresos = movimientosMostrar.filter(h => h.tipo === "Adelanto" || h.tipo === "Cobro Total");
+            // Tomamos solo los últimos 5 para no saturar la vista
+            const ultimosMovimientos = movimientosMúsico.slice(0, 5);
 
             return `
-                <div class="card-estilo border-l-8 border-indigo-600 bg-white">
+                <div class="card-estilo border-l-8 border-indigo-600 bg-white animate-in fade-in slide-in-from-bottom-2">
                     <div class="flex justify-between items-start mb-4">
-                        <span class="text-3xl font-black text-slate-800 leading-none">${n}</span>
-                        <span class="text-3xl font-black text-indigo-700 leading-none">$${saldos[n].toLocaleString('es-CO')}</span>
+                        <div>
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Músico</p>
+                            <span class="text-2xl font-black text-slate-800 leading-none">${n}</span>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Saldo</p>
+                            <span class="text-2xl font-black text-indigo-700 leading-none">$${saldoActual.toLocaleString('es-CO')}</span>
+                        </div>
                     </div>
-                    <div class="text-[10px] text-slate-400 font-bold uppercase mb-2">Ciclo de Cobro Actual</div>
-                    <div class="max-h-32 overflow-y-auto text-[13px] bg-slate-50 p-4 rounded-3xl font-bold">
-                        ${egresos.map(h => `
-                            <div class="flex justify-between py-1 border-b border-slate-200">
-                                <span>${h.fecha} <b class="text-[9px] text-indigo-500 uppercase">${h.tipo}</b></span>
-                                <span class="text-red-500">-$${h.monto.toLocaleString()}</span>
+                    
+                    <div class="text-[10px] text-slate-400 font-bold uppercase mb-2 italic">Últimos movimientos</div>
+                    <div class="bg-slate-50 p-4 rounded-3xl font-bold">
+                        ${ultimosMovimientos.length > 0 ? ultimosMovimientos.map(h => `
+                            <div class="flex justify-between py-2 border-b border-slate-100 last:border-0 text-[11px]">
+                                <span>${h.fecha} <b class="text-indigo-500 ml-2">${h.tipo}</b></span>
+                                <span class="text-red-500">-$${(h.monto || 0).toLocaleString()}</span>
                             </div>
-                        `).join('') || '<span class="text-slate-300 italic">Sin movimientos en este ciclo</span>'}
+                        `).join('') : '<p class="text-slate-300 text-center text-xs italic py-2">Sin historial reciente</p>'}
                     </div>
-                    <button onclick="confirmarCobroTotal('${n}')" class="w-full mt-6 bg-slate-900 text-white py-5 rounded-[2rem] font-black text-sm uppercase shadow-lg">Liquidar Cuenta</button>
+                    
+                    <button onclick="confirmarCobroTotal('${n}')" 
+                        class="w-full mt-6 bg-slate-900 text-white py-5 rounded-[2rem] font-black text-xs uppercase shadow-lg active:scale-95 transition-transform">
+                        Liquidar Cuenta Completa
+                    </button>
                 </div>
             `;
         }).join('');
