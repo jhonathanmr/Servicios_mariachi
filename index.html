@@ -232,7 +232,7 @@
             const ahora = new Date();
             
             // 2. Restamos 5 horas (5 * 60 * 60 * 1000 milisegundos)
-            const fechaColombia = new Date(ahora.getTime() - (5 * 60 * 60 * 1000));
+            const fechaColombia = new Date(ahora.getTime() - (11 * 60 * 60 * 1000));
             
             // 3. Lo convertimos a formato ISO (YYYY-MM-DDTHH:mm...) y tomamos solo la fecha
             const soloFecha = fechaColombia.toISOString().split('T')[0];
@@ -466,31 +466,39 @@
         });
     }
 
-function confirmarGuardarSerenatas() {
-    let fechaInput = document.getElementById('fecha-serenata').value; // Viene como AAAA-MM-DD
-    
-    // Convertimos de AAAA-MM-DD a DD/MM/AAAA
-    let partes = fechaInput.split('-');
-    let fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`;
+    function confirmarGuardarSerenatas() {
+        let fechaInput = document.getElementById('fecha-serenata').value;
+        let partes = fechaInput.split('-');
+        let fechaFormateada = `${partes[2]}/${partes[1]}/${partes[0]}`;
 
-    mostrarModal("¿Confirmar Registro?", "Los datos se cargarán...", "💾", async () => {
-        INTEGRANTES.forEach((n, i) => {
-            const total = limpiarValor(document.getElementById(`total-${i}`).innerText);
-            if(total > 0) {
-                saldos[n] += total;
-                historial.unshift({ 
-                    nombre: n, 
-                    monto: total, 
-                    fecha: fechaFormateada, // <--- Usamos la fecha convertida
-                    tipo: "Serenatas de la fecha" ,
-                    timestamp: new Date().getTime()
-                });
+        mostrarModal("¿Confirmar Registro?", "Los datos se cargarán...", "💾", async () => {
+            
+            // --- CORRECCIÓN CRÍTICA ---
+            // Si historial es un objeto, lo convertimos a arreglo antes de operar
+            if (!Array.isArray(historial)) {
+                historial = historial ? Object.values(historial) : [];
             }
+
+            INTEGRANTES.forEach((n, i) => {
+                const total = limpiarValor(document.getElementById(`total-${i}`).innerText);
+                if(total > 0) {
+                    saldos[n] += total;
+                    
+                    // Ahora .unshift() funcionará siempre
+                    historial.unshift({ 
+                        nombre: n, 
+                        monto: total, 
+                        fecha: fechaFormateada,
+                        tipo: "Serenatas de la fecha",
+                        timestamp: new Date().getTime()
+                    });
+                }
+            });
+            
+            await sincronizarNube();
+            navegar('menu');
         });
-        await sincronizarNube();
-        navegar('menu');
-    });
-}
+    }
 
     function cambiarTabCobro(tab) {
         const isA = tab === 'adelantos';
@@ -528,8 +536,14 @@ function confirmarGuardarSerenatas() {
         const list = document.getElementById('lista-totales');
         if (!list) return;
 
-        // Aseguramos que tenemos datos
-        const dataHistorial = window.historial || historial || [];
+        // --- NORMALIZACIÓN DE DATOS ---
+        // 1. Aseguramos que sea un Array (si es objeto, extraemos sus valores)
+        const rawHistorial = window.historial || historial || [];
+        const dataHistorial = Array.isArray(rawHistorial) 
+            ? rawHistorial 
+            : Object.values(rawHistorial);
+
+        // 2. Aseguramos que sea un Objeto para los saldos
         const dataSaldos = window.saldos || saldos || {};
 
         if (INTEGRANTES.length === 0) {
@@ -540,18 +554,16 @@ function confirmarGuardarSerenatas() {
         list.innerHTML = INTEGRANTES.map(n => {
             const saldoActual = dataSaldos[n] || 0;
             
-            // Buscamos los movimientos del músico
-            // Filtramos por nombre y por tipos que representen salidas de dinero
+            // Filtramos con seguridad
             const movimientosMúsico = dataHistorial.filter(h => 
-                h.nombre === n && 
+                h && h.nombre === n && h.tipo &&
                 (h.tipo.includes("Adelanto") || h.tipo.includes("LIQUIDACIÓN") || h.tipo.includes("Cobro"))
             );
 
-            // Tomamos solo los últimos 5 para no saturar la vista
             const ultimosMovimientos = movimientosMúsico.slice(0, 5);
 
             return `
-                <div class="card-estilo border-l-8 border-indigo-600 bg-white animate-in fade-in slide-in-from-bottom-2">
+                <div class="card-estilo border-l-8 border-indigo-600 bg-white animate-in fade-in slide-in-from-bottom-2 mb-4 p-6 rounded-[2.5rem] shadow-xl">
                     <div class="flex justify-between items-start mb-4">
                         <div>
                             <p class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Músico</p>
@@ -567,7 +579,7 @@ function confirmarGuardarSerenatas() {
                     <div class="bg-slate-50 p-4 rounded-3xl font-bold">
                         ${ultimosMovimientos.length > 0 ? ultimosMovimientos.map(h => `
                             <div class="flex justify-between py-2 border-b border-slate-100 last:border-0 text-[11px]">
-                                <span>${h.fecha} <b class="text-indigo-500 ml-2">${h.tipo}</b></span>
+                                <span>${h.fecha || 'S/F'} <b class="text-indigo-500 ml-2">${h.tipo}</b></span>
                                 <span class="text-red-500">-$${(h.monto || 0).toLocaleString()}</span>
                             </div>
                         `).join('') : '<p class="text-slate-300 text-center text-xs italic py-2">Sin historial reciente</p>'}
