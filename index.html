@@ -281,8 +281,9 @@
     };
 
     const VALOR_BASE = 35000;
-    const INTEGRANTES = ["Alejandra", "Deivy", "Camilo", "Carlos", "Jhon", "Tatu"];
-    
+    const INTEGRANTES = ["Camilo","Alejandra", "Deivy", "Carlos", "Jhon", "Tatu", "Valentina"];
+    const INTEGRANTE_MANUAL = "Valentina";
+
     let config = { pass: "123" };
     let saldos = {};
     let historial = [];
@@ -422,46 +423,68 @@
     }
 
     function renderizarSerenatas() {
-    const list = document.getElementById('lista-integrantes-serenata');
-    const cantGral = document.getElementById('cant-global').value;
-    
-    list.innerHTML = INTEGRANTES.map((n, i) => `
-        <div class="card-estilo border-l-8 border-emerald-500">
-            <div class="flex justify-between items-center mb-6">
-                <span class="text-3xl font-black text-slate-800">${n}</span>
-                <div class="flex items-center gap-4 bg-slate-50 rounded-2xl px-2 py-1 shadow-inner">
-                    <button onclick="ajustarIndividual(${i}, -1)" class="w-12 h-12 bg-white rounded-xl shadow font-black text-2xl">-</button>
-                    <input type="number" id="cant-${i}" value="${cantGral}" onchange="recalcularTodo()" class="w-10 text-center font-black bg-transparent border-none text-2xl">
-                    <button onclick="ajustarIndividual(${i}, 1)" class="w-12 h-12 bg-white rounded-xl shadow font-black text-2xl text-emerald-500">+</button>
+        const list = document.getElementById('lista-integrantes-serenata');
+        const cantGral = document.getElementById('cant-global').value;
+        
+        list.innerHTML = INTEGRANTES.map((n, i) => {
+            // Verificamos si es el integrante de carga manual
+            const esManual = (n === INTEGRANTE_MANUAL);
+
+            return `
+            <div class="card-estilo border-l-8 ${esManual ? 'border-orange-500' : 'border-emerald-500'}">
+                <div class="flex justify-between items-center mb-6">
+                    <span class="text-3xl font-black text-slate-800">${n}</span>
+                    
+                    ${!esManual ? `
+                        <div class="flex items-center gap-4 bg-slate-50 rounded-2xl px-2 py-1 shadow-inner">
+                            <button onclick="ajustarIndividual(${i}, -1)" class="w-12 h-12 bg-white rounded-xl shadow font-black text-2xl">-</button>
+                            <input type="number" id="cant-${i}" value="${cantGral}" onchange="recalcularTodo()" class="w-10 text-center font-black bg-transparent border-none text-2xl">
+                            <button onclick="ajustarIndividual(${i}, 1)" class="w-12 h-12 bg-white rounded-xl shadow font-black text-2xl text-emerald-500">+</button>
+                        </div>
+                    ` : `
+                        <span class="text-[10px] font-black text-orange-500 uppercase bg-orange-50 px-3 py-1 rounded-full">Cobro Manual</span>
+                        <input type="hidden" id="cant-${i}" value="0">
+                    `}
+                </div>
+                
+                <div class="flex justify-between items-center mb-2">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase italic">
+                        ${esManual ? 'Valor a pagar hoy' : 'Extras / Otros'}
+                    </span>
+                    <input type="text" 
+                        id="extra-${i}" 
+                        inputmode="numeric" 
+                        pattern="[0-9]*" 
+                        value="0" 
+                        oninput="formatearInput(this); recalcularTodo()" 
+                        class="w-40 p-3 bg-slate-50 border-none rounded-2xl text-right font-black text-xl ${esManual ? 'ring-2 ring-orange-200' : ''}">
+                </div>
+
+                <div class="text-right mt-4 border-t border-slate-100 pt-4">
+                    <span class="${esManual ? 'text-orange-600' : 'text-emerald-600'} font-black text-3xl tracking-tighter">$ <span id="total-${i}">0</span></span>
                 </div>
             </div>
-            
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-[10px] font-bold text-slate-400 uppercase italic">Extras / Otros</span>
-                <input type="text" 
-                    id="extra-${i}" 
-                    inputmode="numeric" 
-                    pattern="[0-9]*" 
-                    value="0" 
-                    oninput="formatearInput(this); recalcularTodo()" 
-                    class="w-40 p-3 bg-slate-50 border-none rounded-2xl text-right font-black text-xl">
-            </div>
-
-            <div class="text-right mt-4 border-t border-slate-100 pt-4">
-                <span class="text-emerald-600 font-black text-3xl tracking-tighter">$ <span id="total-${i}">0</span></span>
-            </div>
-        </div>
-    `).join('');
-    
-    recalcularTodo();
-}
+        `}).join('');
+        
+        recalcularTodo();
+    }
 
     function recalcularTodo() {
         const recGral = limpiarValor(document.getElementById('recargo-gral').value);
         INTEGRANTES.forEach((n, i) => {
+            const esManual = (n === INTEGRANTE_MANUAL);
             const cantIndiv = parseInt(document.getElementById(`cant-${i}`).value) || 0;
-            const recIndiv = limpiarValor(document.getElementById(`extra-${i}`).value);
-            const total = (cantIndiv * VALOR_BASE) + (cantIndiv > 0 ? recGral : 0) + recIndiv;
+            const valorManualUExtra = limpiarValor(document.getElementById(`extra-${i}`).value);
+            
+            let total = 0;
+            if (esManual) {
+                // Para la persona manual, el total es simplemente lo que escribas en el input
+                total = valorManualUExtra;
+            } else {
+                // Lógica normal para el resto del Mariachi
+                total = (cantIndiv * VALOR_BASE) + (cantIndiv > 0 ? recGral : 0) + valorManualUExtra;
+            }
+            
             document.getElementById(`total-${i}`).innerText = total.toLocaleString('es-CO');
         });
     }
@@ -473,18 +496,22 @@
 
         mostrarModal("¿Confirmar Registro?", "Los datos se cargarán...", "💾", async () => {
             
-            // --- CORRECCIÓN CRÍTICA ---
-            // Si historial es un objeto, lo convertimos a arreglo antes de operar
+            // 1. Aseguramos que historial sea un arreglo
             if (!Array.isArray(historial)) {
                 historial = historial ? Object.values(historial) : [];
             }
 
             INTEGRANTES.forEach((n, i) => {
                 const total = limpiarValor(document.getElementById(`total-${i}`).innerText);
+                
                 if(total > 0) {
+                    // 2. PROTECCIÓN CRÍTICA: Si el integrante no existe en saldos, lo creamos
+                    if (saldos[n] === undefined || saldos[n] === null) {
+                        saldos[n] = 0;
+                    }
+
                     saldos[n] += total;
                     
-                    // Ahora .unshift() funcionará siempre
                     historial.unshift({ 
                         nombre: n, 
                         monto: total, 
@@ -495,8 +522,14 @@
                 }
             });
             
-            await sincronizarNube();
-            navegar('menu');
+            // 3. Sincronizamos
+            try {
+                await sincronizarNube();
+                navegar('menu');
+            } catch (error) {
+                console.error("Error real:", error);
+                mostrarModal("Error de Datos", "No se pudo guardar. Revisa la consola.", "❌", () => {});
+            }
         });
     }
 
